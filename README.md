@@ -1,13 +1,34 @@
-It's an asymmetric coroutine library (like lua).
+在github看到的协程库，只有不到两百行，索性克隆来看看
 
-You can use coroutine_open to open a schedule first, and then create coroutine in that schedule. 
+结果感觉和xv6实验里的用户级线程实现没什么区别，只是此处在上下文切换上用的系统函数，而实验里用的汇编
 
-You should call coroutine_resume in the thread that you call coroutine_open, and you can't call it in a coroutine in the same schedule.
+原来这就是协程？貌似只是伪切换？感觉每一步知道初始状态都可以提前得到？
 
-Coroutines in the same schedule share the stack , so you can create many coroutines without worry about memory.
+感觉代码写得还是有些奇怪，于是做了些更改
 
-But switching context will copy the stack the coroutine used.
 
-Read source for detail.
+先写了一个类似xv6中用户级thread的版本
+主要api包括
+- init 分配第一个协程给main
+- create 从协程表中分配一个新的协程
+- schedule 从协程表中选择可运行的协程，与当前协程交换
+- yield 更改当前协程状态为可运行，调用schedule
+- wrapfunc 包装用户传入的函数，在执行后进行协程释放
+- join 循环等待所有协程结束(这里语义更像run)，也可以根据实际情况编写
+- release 释放主协程，由创建的协程交替执行，直到所有协程结束
 
-Chinese blog : http://blog.codingnow.com/2012/07/c_coroutine.html
+以上api在协程创建后，主要通过传入func中的yield和main函数中对于协程的操作来进行切换并控制流程。
+
+该版本实现特点
+- 通过数组实现协程表，大小固定
+- 协程独立栈空间
+- 无resume，只有yield，不能切换到某个指定协程
+
+本项目中的实现是动态分配协程表，共享栈空间，未显式分配主协程，只保存了上下文。resume语义为切换到指定协程，yield语义为切换到主进程
+这里写得有点烂，确实不太好设计。实现了两个类
+- Coroutine 主要包含了协程状态信息，栈指针，上下文等
+- CoScheduler 维护了协程表，提供了create，resume，yield，destroy等操作
+
+但是总感觉实现的不如第一种的api
+
+xv6-style使用独立栈，恢复上下文不需要复制，提供的api更像是对称的yield，主协程和其他协程都可使用，并且是在协程表中按顺序找到第一个可运行的协程。
