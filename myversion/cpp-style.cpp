@@ -169,11 +169,6 @@ public:
         sch->curId = -1;
     }
     bool dead(size_t id) { return coroutines[id].dead(); }
-    void run()
-    {
-        while (cnt > 0) {
-        }
-    }
 };
 CoScheduler &sch = CoScheduler::getInstance();
 int create(std::function<void()> tk)
